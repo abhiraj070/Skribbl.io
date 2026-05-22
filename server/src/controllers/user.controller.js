@@ -1,7 +1,18 @@
+import jwt from 'jsonwebtoken';
 import { User } from '../model/user.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
+
+const getCookieOptions = () => {
+    const isProd = process.env.NODE_ENV === "production"
+    return {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? "none" : "lax",
+        path: "/",
+    }
+}
 const register= asyncHandler(async (req,res) => {
     const {name, email, password}= req.body
     if(!name || !email || !password){
@@ -47,12 +58,8 @@ const login= asyncHandler(async (req, res) => {
         throw new ApiError(500,"Error while generating tokens")
     }
 
-    const isProd = process.env.NODE_ENV === "production"
     const cookieOptions = {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? "none" : "lax",
-        path: "/",
+        ...getCookieOptions(),
         maxAge: 7 * 24 * 60 * 60 * 1000,
     }
 
@@ -67,4 +74,20 @@ const login= asyncHandler(async (req, res) => {
     .json(new ApiResponse(200,{user: loggedUser, accessToken},"User logged in successfully"))
 })
 
-export {login, register}
+const logout = asyncHandler(async (req, res) => {
+    const cookieOptions = getCookieOptions()
+    const refreshToken = req.cookies?.refreshToken
+
+    if (refreshToken) {
+            const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET)
+            await User.findByIdAndUpdate(decoded.id, { $unset: { refreshToken: 1 } })
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", cookieOptions)
+        .clearCookie("refreshToken", cookieOptions)
+        .json(new ApiResponse(200, {}, "User logged out successfully"))
+})
+
+export { login, register, logout }

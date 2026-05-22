@@ -1,6 +1,6 @@
-import { JWT } from "jsonwebtoken"
-import { ApiError } from "../utils/ApiError"
-import { User } from "../model/user.model"
+import  JWT  from "jsonwebtoken"
+import { ApiError } from "../utils/ApiError.js"
+import { User } from "../model/user.model.js"
 const VerifyJWT= async (req, res, next)=>{
     const accessToken= req.cookies?.accessToken || req.headers("Authorization")?.replace("Bearer ","")
     if(!accessToken){
