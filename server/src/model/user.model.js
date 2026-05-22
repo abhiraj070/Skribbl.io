@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import JWT from 'jsonwebtoken';
 
@@ -21,6 +20,10 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Password is required'],
       select: false,
     },
+    refreshToken: {
+      type: String,
+      select: false,
+    },
   },
   { timestamps: true }
 );
@@ -29,6 +32,10 @@ userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
+
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return bcrypt.compare(password, this.password);
+};
 
 userSchema.methods.generateAccessToken= async function(){
   return JWT.sign(

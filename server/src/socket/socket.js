@@ -42,6 +42,8 @@ export const InitliseIO = (io) => {
         socket.on("sent-message",(roomId, message, sender)=>{
             socket.to(roomId).emit("sent-message-recived",{message, sender})
         })
-        
+
     });
 }
+
+export {rooms}
