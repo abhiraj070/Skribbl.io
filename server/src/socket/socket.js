@@ -27,7 +27,7 @@ export const InitliseIO = (io) => {
             if(!rooms[roomId]) return
             rooms[roomId].users.push({id: joinerId, username: username, points: 0})
             socket.join(roomId)
-            socketIdToId={id: socket.id, roomId: roomId}
+            socketIdToId[socket.id]={id: socket.id, roomId: roomId}
         })
 
         socket.on("leave-room",(roomId, leftId)=>{
@@ -37,10 +37,35 @@ export const InitliseIO = (io) => {
         })
 
         socket.on("disconnecting",()=>{
-            const userleaving= socketIdToId[socket.id]
-            rooms[userleaving.roomId].users=rooms[userleaving.roomId].users.filter((user)=>{return user.id!=userleaving.id})
-            if(rooms[userleaving.roomId].users.length===0) delete rooms[userleaving.roomId]
-            delete idToSocketId[userleaving.id]
+            const entry = socketIdToId[socket.id]
+            if(!entry){
+                return
+            }
+
+            let userId, roomId
+            if(typeof entry === "string"){
+                userId = entry
+                for(const rid of Object.keys(rooms)){
+                    if(rooms[rid]?.users?.some((u)=>u.id == userId)){
+                        roomId = rid
+                        break
+                    }
+                }
+            } else {
+                userId = entry.id
+                roomId = entry.roomId
+            }
+
+            if(roomId && rooms[roomId]){
+                rooms[roomId].users = rooms[roomId].users.filter((u)=>u.id != userId)
+                if(rooms[roomId].users.length === 0){
+                    delete rooms[roomId]
+                } else {
+                    io.to(roomId).emit("user-left", { userId })
+                }
+            }
+
+            if(userId) delete idToSocketId[userId]
             delete socketIdToId[socket.id]
         })
 
@@ -61,19 +86,20 @@ export const InitliseIO = (io) => {
             function startWordSelection(){
                 selectedWords= selectWords()
                 const room=rooms[roomId]
-                socket.to(room.users[room.nextChance]).emit("Word-Selection-Phase",{words: selectedWords, duration: 10})
-                room.users.length<room.nextChance-1 ? room.nextChance+=1: room.nextChance=0
+                socket.to(idToSocketId[room.users[room.nextChance]]).emit("Word-Selection-Phase",{words: selectedWords, duration: 10})
+                room.users.length-1>room.nextChance ? room.nextChance+=1: room.nextChance=0
 
-                selectionTimer[roomId]= setTimeout(()=>{
+                selectionTimer[roomId]= setInterval(()=>{
                     autoPickWord()
                 },10000)
             }
             function autoPickWord(){
                 const idx= Math.floor(Math.random()*3)
                 const room=rooms[roomId]
-                socket.to(room.nextChance-1).emit("Drawing-Phase",{wordSelected: selectedWords[idx], duration: 100})
+                socket.to(idToSocketId[room.users[room.nextChance-1]]).emit("Drawing-Phase",{wordSelected: selectedWords[idx], duration: 100})
                 socket.to(roomId).emit("Gussing-Phase",{lengthOfWordSelected: selectedWords[idx].length, duration: 100})
                 setInterval(()=>{
+                    io.to(roomId).emit("Correct-Word",{corectWord: selectedWords[idx]})
                     endRound()
                 },100000)
             }
@@ -81,7 +107,9 @@ export const InitliseIO = (io) => {
                 io.to(roomId).emit("Show-Result-Phase",{duration: 10})
                 const room=rooms[roomId]
                 room.rounds-=1;
-                rooms.rounds===0 ? endGame() : startWordSelection()
+                setInterval(()=>{
+                    room.rounds===0 ? endGame() : startWordSelection()
+                },10000)
             }
             function endGame(){
                 io.to(roomId).emit("Game-End-Phase",{})
@@ -90,11 +118,12 @@ export const InitliseIO = (io) => {
         })
 
         socket.on("word-selected",({selectedWord,roomId})=>{
-            clearTimeout(selectionTimer[roomId])
+            clearInterval(selectionTimer[roomId])
             const room=rooms[roomId]
             socket.to(room.nextChance-1).emit("Drawing-Phase",{wordSelected: selectedWord})
             socket.to(roomId).emit("Gussing-Phase",{lengthOfWordSelected: selectedWord.length})
             setInterval(()=>{
+                io.to(roomId).emit("Correct-Word",{corectWord: selectedWord})
                 endRound()
             },100000)
 
@@ -102,7 +131,9 @@ export const InitliseIO = (io) => {
                 io.to(roomId).emit("Show-Result-Phase",{duration: 10})
                 const room=rooms[roomId]
                 room.rounds-=1;
-                rooms.rounds===0 ? endGame() : startWordSelection()
+                setInterval(()=>{
+                    room.rounds===0 ? endGame() : startWordSelection()
+                },10000)
             }
             function endGame(){
                 io.to(roomId).emit("Game-End-Phase",{})
