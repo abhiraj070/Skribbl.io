@@ -1,8 +1,8 @@
-import jwt from 'jsonwebtoken';
 import { User } from '../model/user.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
+import { rooms } from '../socket/socket.js';
 
 const getCookieOptions = () => {
     const isProd = process.env.NODE_ENV === "production"
@@ -76,12 +76,8 @@ const login= asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
     const cookieOptions = getCookieOptions()
-    const refreshToken = req.cookies?.refreshToken
 
-    if (refreshToken) {
-            const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET)
-            await User.findByIdAndUpdate(decoded.id, { $unset: { refreshToken: 1 } })
-    }
+    await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } })
 
     return res
         .status(200)
@@ -90,4 +86,55 @@ const logout = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
-export { login, register, logout }
+const getRoomUsers = asyncHandler(async (req, res) => {
+    const { roomId } = req.query
+
+    if (!roomId) {
+        throw new ApiError(400, "roomId is required")
+    }
+
+    const room = rooms[roomId]
+    if (!room) {
+        throw new ApiError(404, "Room not found")
+    }
+
+    const dbUsers = await User.find({ _id: { $in: room.users.map((u) => u.id) } })
+        .select('name')
+        .lean()
+
+    const nameById = Object.fromEntries(dbUsers.map((u) => [String(u._id), u.name]))
+
+    const users = room.users.map((u) => ({
+        username: u.username,
+        name: nameById[String(u.id)] ?? null,
+        points: u.points ?? 0,
+    }))
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { users, word: room.word }, "Room users fetched successfully"))
+})
+
+const getRoomWord = asyncHandler(async (req, res) => {
+    const { roomId } = req.query
+
+    if (!roomId) {
+        throw new ApiError(400, "roomId is required")
+    }
+
+    const room = rooms[roomId]
+    if (!room) {
+        throw new ApiError(404, "Room not found")
+    }
+
+    const word = room.word
+    if (!word || (typeof word === "object" && Object.keys(word).length === 0)) {
+        throw new ApiError(404, "Word not set")
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, word, "Room word fetched successfully"))
+})
+
+export { login, register, logout, getRoomUsers, getRoomWord }

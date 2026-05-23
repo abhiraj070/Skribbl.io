@@ -14,13 +14,14 @@ export const InitliseIO = (io) => {
             rooms[roomId]={
                     host: hostId,
                     users: [],
+                    word: {}
                 }
-            rooms[roomId].users.push({id: hostId, username: username})
+            rooms[roomId].users.push({id: hostId, username: username, points: 0})
         })
 
         socket.on("join-room",({roomId, joinerId, username})=>{
             if(!rooms[roomId]) return
-            rooms[roomId].users.push({id: joinerId, username: username})
+            rooms[roomId].users.push({id: joinerId, username: username, points: 0})
             socket.join(roomId)
             socketIdToId={id: socket.id, roomId: roomId}
         })
@@ -42,6 +43,22 @@ export const InitliseIO = (io) => {
         socket.on("sent-message",(roomId, message, sender)=>{
             socket.to(roomId).emit("sent-message-recived",{message, sender})
         })
+
+        socket.on("start-game",({roomId})=>{
+            socket.to(roomId).emit("start-my-game",{})
+        })
+
+        socket.on("selected-word",({roomId, word})=>{
+            socket.to(roomId).emit("selected-word-recive",{word})
+            rooms[roomId].word=word
+        })
+
+        socket.on("score-update",({roomId, playerId, points})=>{
+            const user = rooms[roomId].users.find(user => user.id == playerId)
+            user.points=points
+        })
+
+        
 
     });
 }
