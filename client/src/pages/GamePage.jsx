@@ -17,6 +17,14 @@ const PHASES = {
 
 const CORRECT_MARKER = "__SKRIBBL_CORRECT__";
 
+// Match server/src/socket/socket.js phase durations
+const PHASE_DURATIONS = {
+  STARTING: 5,
+  WORD_SELECTION: 10,
+  DRAWING: 100,
+  RESULT: 10,
+};
+
 const DRAWER_TIERS = [
   [1.0, 80], [0.9, 70], [0.7, 60], [0.5, 50], [0.3, 40],
 ];
@@ -139,7 +147,7 @@ export default function GamePage() {
         startPhase(PHASES.WORD_SELECTION, duration);
         pushSystem("Pick a word to draw!", "muted");
       },
-      "Drawing-Phase": ({ wordSelected, duration = 80 } = {}) => {
+      "Drawing-Phase": ({ wordSelected, duration = PHASE_DURATIONS.DRAWING } = {}) => {
         setIsDrawer(true);
         setDrawerWord(wordSelected);
         setRevealedWord(null);
@@ -149,7 +157,7 @@ export default function GamePage() {
         startPhase(PHASES.DRAWING, duration);
         pushSystem(`You're drawing: ${wordText(wordSelected) || "?"}`, "muted");
       },
-      "Gussing-Phase": ({ lengthOfWordSelected, duration = 80 } = {}) => {
+      "Gussing-Phase": ({ lengthOfWordSelected, duration = PHASE_DURATIONS.DRAWING } = {}) => {
         resetRound();
         setIsDrawer(false);
         setWordLength(lengthOfWordSelected || 0);
@@ -163,7 +171,7 @@ export default function GamePage() {
         setRevealedWord(w);
         pushSystem(`The word was: ${w.toUpperCase()}`, "success");
       },
-      "Show-Result-Phase": ({ duration = 8 } = {}) => {
+      "Show-Result-Phase": ({ duration = PHASE_DURATIONS.RESULT } = {}) => {
         startPhase(PHASES.RESULT, duration);
         if (isDrawerRef.current) {
           const total = Math.max(players.length - 1, 1);
@@ -207,7 +215,7 @@ export default function GamePage() {
     setWordChoices(null);
     setChatInput("");
     setGuessInput("");
-    startPhase(PHASES.DRAWING, 80);
+    startPhase(PHASES.DRAWING, PHASE_DURATIONS.DRAWING);
   };
 
   const submitMessage = (text, setInput) => {
