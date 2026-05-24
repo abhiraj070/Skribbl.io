@@ -85,10 +85,6 @@ export default function LobbyPage() {
           <h1 className="font-display text-2xl font-bold">Skribbl</h1>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 chip bg-white/5 border border-white/10 text-slate-200">
-            <span className={`w-2 h-2 rounded-full ${connected ? "bg-success" : "bg-amber-400"}`} />
-            {connected ? "Online" : "Connecting…"}
-          </div>
           <div className="text-right">
             <div className="text-xs text-slate-400">Signed in as</div>
             <div className="text-sm font-semibold">{user?.name || user?.email}</div>
@@ -114,17 +110,26 @@ export default function LobbyPage() {
             Jump into a private room with friends or create your own and pick
             how many rounds you want to play.
           </p>
-          <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
-            {[
-              { k: "🖌", t: "Draw" },
-              { k: "💬", t: "Guess" },
-              { k: "🏆", t: "Win" },
-            ].map((it) => (
-              <div key={it.t} className="glass p-4 text-center">
-                <div className="text-2xl">{it.k}</div>
-                <div className="text-sm mt-1 text-slate-200">{it.t}</div>
+          <div className="mt-8 max-w-md">
+            <div className="relative glass p-5 -rotate-1 hover:rotate-0 transition-transform duration-300">
+              <div className="absolute -top-3 left-5 px-2.5 py-0.5 bg-accent-500 text-[11px] font-bold uppercase tracking-wider rounded-full shadow-glow">
+                house rules
               </div>
-            ))}
+              <ul className="mt-2 space-y-2 text-slate-200 text-[15px] leading-relaxed">
+                <li className="flex gap-2">
+                  <span className="text-accent-400">→</span>
+                  no googling. we&apos;ll know.
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-accent-400">→</span>
+                  bad drawing can lead to an FIR.
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-accent-400">→</span>
+                  loser refills the snacks irl.
+                </li>
+              </ul>
+            </div>
           </div>
         </section>
 
@@ -151,7 +156,14 @@ export default function LobbyPage() {
             ))}
           </div>
 
-          <div className="space-y-4">
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (tab === "join") handleJoin();
+              else handleCreate();
+            }}
+          >
             <div>
               <label className="label">Display name</label>
               <input
@@ -203,15 +215,15 @@ export default function LobbyPage() {
             )}
 
             {tab === "join" ? (
-              <button onClick={handleJoin} className="btn-primary w-full">
+              <button type="submit" className="btn-primary w-full">
                 Join Room →
               </button>
             ) : (
-              <button onClick={handleCreate} className="btn-accent w-full">
+              <button type="submit" className="btn-accent w-full">
                 Create Room →
               </button>
             )}
-          </div>
+          </form>
         </section>
       </main>
     </div>

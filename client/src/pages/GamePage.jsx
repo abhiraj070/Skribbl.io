@@ -52,16 +52,13 @@ export default function GamePage() {
   const [phaseKey, setPhaseKey] = useState(0);
   const [phaseSeconds, setPhaseSeconds] = useState(5);
 
-  // Word state
   const [wordChoices, setWordChoices] = useState(null);
   const [drawerWord, setDrawerWord] = useState(null);
   const [wordLength, setWordLength] = useState(0);
   const [revealedWord, setRevealedWord] = useState(null);
 
-  // Role state
   const [isDrawer, setIsDrawer] = useState(false);
 
-  // Chat & guess state
   const [chat, setChat] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [guessInput, setGuessInput] = useState("");
@@ -114,7 +111,6 @@ export default function GamePage() {
       },
     ]);
 
-  // Reset round-specific state
   const resetRound = () => {
     setWordChoices(null);
     setDrawerWord(null);
@@ -142,7 +138,6 @@ export default function GamePage() {
     isDrawerRef.current = isDrawer;
   }, [isDrawer]);
 
-  // ---- Socket bindings ----
   useEffect(() => {
     if (!socket) return;
 
@@ -173,7 +168,6 @@ export default function GamePage() {
     };
 
     const onDrawing = ({ wordSelected, duration = 80 } = {}) => {
-      // Sent only to the drawer
       setIsDrawer(true);
       setDrawerWord(wordSelected);
       setRevealedWord(null);
@@ -187,7 +181,6 @@ export default function GamePage() {
     };
 
     const onGuessing = ({ lengthOfWordSelected, duration = 80 } = {}) => {
-      // Sent to non-drawers (including everyone in room on new round)
       resetGuesserRound();
       setIsDrawer(false);
       setWordLength(lengthOfWordSelected || 0);
@@ -198,7 +191,6 @@ export default function GamePage() {
     };
 
     const onSelectedWord = ({ word } = {}) => {
-      // Non-drawers learn the word silently (used for client-side guess check)
       setDrawerWord(word || null);
     };
 
@@ -215,7 +207,6 @@ export default function GamePage() {
       setPhaseSeconds(duration);
       setPhaseKey((k) => k + 1);
 
-      // Drawer awards themselves based on how many guessed correctly
       if (isDrawerRef.current) {
         const total = Math.max(players.length - 1, 1);
         const correct = correctGuessersRef.current.size;
@@ -237,7 +228,6 @@ export default function GamePage() {
         }
       }
 
-      // Refresh leaderboard after a brief delay (let score-update events land)
       setTimeout(fetchPlayers, 600);
     };
 
@@ -289,7 +279,6 @@ export default function GamePage() {
     };
   }, [socket, players.length, roomId, user?._id, fetchPlayers]);
 
-  // ---- Actions ----
   const pickWord = (w) => {
     if (!socket || !w) return;
     socket.emit("word-selected", { selectedWord: w, roomId });
@@ -305,12 +294,34 @@ export default function GamePage() {
     setGuessInput("");
   };
 
+  const getTargetWord = () =>
+    (drawerWord?.word || drawerWord || "").toString().trim().toLowerCase();
+
+  const handleCorrectGuess = () => {
+    setHasGuessedCorrect(true);
+    correctGuessersRef.current.add(username);
+    pushSystem(`✓ You guessed it! +100 points`, "success");
+    socket.emit("score-update", {
+      roomId,
+      playerId: user._id,
+      points: 100,
+      delta: 100,
+    });
+    socket.emit("sent-message", roomId, CORRECT_MARKER, username);
+  };
+
   const sendChat = (e) => {
     e?.preventDefault?.();
     const text = chatInput.trim();
     if (!text || !socket) return;
     if (hasGuessedCorrect) return;
     if (isDrawingAsDrawer) return;
+    const target = getTargetWord();
+    if (target && text.toLowerCase() === target) {
+      handleCorrectGuess();
+      setChatInput("");
+      return;
+    }
     pushUserMessage(username, text);
     socket.emit("sent-message", roomId, text, username);
     setChatInput("");
@@ -322,18 +333,9 @@ export default function GamePage() {
     if (!text || !socket) return;
     if (isDrawingAsDrawer) return;
     if (hasGuessedCorrect) return;
-    const target = (drawerWord?.word || drawerWord || "").toString().trim().toLowerCase();
+    const target = getTargetWord();
     if (target && text.toLowerCase() === target) {
-      setHasGuessedCorrect(true);
-      correctGuessersRef.current.add(username);
-      pushSystem(`✓ You guessed it! +100 points`, "success");
-      socket.emit("score-update", {
-        roomId,
-        playerId: user._id,
-        points: 100,
-        delta: 100,
-      });
-      socket.emit("sent-message", roomId, CORRECT_MARKER, username);
+      handleCorrectGuess();
     } else {
       pushUserMessage(username, text);
       socket.emit("sent-message", roomId, text, username);
@@ -355,9 +357,8 @@ export default function GamePage() {
   return (
     <div className="min-h-screen p-4 sm:p-6 relative">
       <div className="max-w-[1400px] mx-auto">
-        {/* Top bar */}
-        <header className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
+        <header className="grid grid-cols-3 items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 justify-self-start">
             <span className="text-2xl">🎨</span>
             <div>
               <div className="text-xs text-slate-400 uppercase tracking-wider">Room</div>
@@ -365,23 +366,29 @@ export default function GamePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="chip bg-white/5 border border-white/10 text-slate-200">
-              <span className="text-slate-400">Phase:</span>
-              <span className="font-semibold">{phase}</span>
+          <div className="justify-self-center">
+            <div
+              className={`w-11 h-11 rounded-full grid place-items-center
+                          font-display font-black text-lg border-2
+                          bg-ink-900/80 shrink-0 ${
+                            timeLeft <= 10 && timeLeft > 0
+                              ? "border-rose-500 text-rose-300 animate-pulse"
+                              : "border-brand-500/70 text-brand-100 shadow-glow"
+                          }`}
+              title="Time left"
+            >
+              {timeLeft}
             </div>
-            <div className="chip bg-brand-500/15 border border-brand-500/30 text-brand-200">
-              ⏱ {timeLeft}s
-            </div>
+          </div>
+
+          <div className="justify-self-end">
             <button onClick={leaveGame} className="btn-ghost !py-2 !px-3 text-sm">
               Leave
             </button>
           </div>
         </header>
 
-        {/* Main 3-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[220px,1fr,320px] gap-4">
-          {/* Left: Players / Scoreboard */}
           <aside className="glass p-4 order-2 lg:order-1">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display text-lg font-bold">Players</h3>
@@ -426,7 +433,6 @@ export default function GamePage() {
             </ul>
           </aside>
 
-          {/* Center: Word + Whiteboard + Overlays */}
           <section className="order-1 lg:order-2 space-y-3">
             <div className="glass p-3 flex items-center justify-between gap-3 flex-wrap">
               <div className="text-xs uppercase tracking-wider text-slate-400">
@@ -541,7 +547,6 @@ export default function GamePage() {
             </div>
           </section>
 
-          {/* Right: Chat + Guess */}
           <aside className="order-3 glass p-4 flex flex-col h-[70vh] lg:h-auto lg:max-h-[80vh]">
             <h3 className="font-display text-lg font-bold mb-3">Chat</h3>
             <div className="flex-1 overflow-y-auto scroll-thin space-y-1.5 pr-1 mb-3 min-h-[200px]">

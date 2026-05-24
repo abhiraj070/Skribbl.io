@@ -31,14 +31,12 @@ export default function WaitingPage() {
     }
   }, [roomId]);
 
-  // Poll the room state until game starts (backend doesn't broadcast joins)
   useEffect(() => {
     fetchPlayers();
     const t = setInterval(fetchPlayers, 2500);
     return () => clearInterval(t);
   }, [fetchPlayers]);
 
-  // Listen for game start
   useEffect(() => {
     if (!socket) return;
     const onStart = () => {
@@ -50,8 +48,25 @@ export default function WaitingPage() {
 
   const handleStart = () => {
     if (!socket || !connected) return;
+    if (!isHost || players.length < 2) return;
     socket.emit("start-game", { roomId, rounds: Number(meta.rounds) || 3 });
   };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Enter") return;
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) {
+        return;
+      }
+      if (isHost && players.length >= 2) {
+        e.preventDefault();
+        handleStart();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const handleLeave = () => {
     if (socket && connected) {
@@ -76,10 +91,6 @@ export default function WaitingPage() {
         <button onClick={handleLeave} className="btn-ghost !py-2 !px-3 text-sm">
           ← Leave
         </button>
-        <div className="flex items-center gap-2 chip bg-white/5 border border-white/10 text-slate-200">
-          <span className={`w-2 h-2 rounded-full ${connected ? "bg-success" : "bg-amber-400"}`} />
-          {connected ? "Connected" : "Connecting…"}
-        </div>
       </header>
 
       <main className="relative z-10 max-w-5xl mx-auto mt-10 grid lg:grid-cols-[1.1fr,1fr] gap-8 items-start">

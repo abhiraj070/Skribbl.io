@@ -32,7 +32,6 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Decorative blobs */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand-500/30 rounded-full blur-3xl animate-float-slow" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-accent-500/20 rounded-full blur-3xl animate-float-slow" />
 
@@ -75,7 +74,7 @@ export default function AuthPage() {
                   name="name"
                   value={form.name}
                   onChange={onChange}
-                  placeholder="Pablo Picasso"
+                  placeholder="Raja Ravi Verma"
                   className="input"
                   autoComplete="name"
                 />
@@ -121,9 +120,6 @@ export default function AuthPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          By continuing you agree to play nicely 😄
-        </p>
       </div>
     </div>
   );
