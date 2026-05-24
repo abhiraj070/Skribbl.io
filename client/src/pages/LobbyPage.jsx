@@ -3,9 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
 
-function generateRoomId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
-}
+const TABS = [
+  { id: "join", label: "Join Room" },
+  { id: "create", label: "Create Room" },
+];
+
+const ROUND_OPTIONS = [1, 2, 3, 5, 8];
+
+const HOUSE_RULES = [
+  "no googling. we'll know.",
+  "bad drawing can lead to an FIR.",
+  "loser refills the snacks irl.",
+];
+
+const newRoomId = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
 export default function LobbyPage() {
   const { user, logout } = useAuth();
@@ -18,59 +29,28 @@ export default function LobbyPage() {
   const [rounds, setRounds] = useState(3);
   const [error, setError] = useState("");
 
-  const ensureUsername = () => {
-    if (!username.trim()) {
-      setError("Pick a display name first");
-      return false;
-    }
-    return true;
-  };
-
-  const handleCreate = () => {
+  const submit = (e) => {
+    e.preventDefault();
     setError("");
-    if (!ensureUsername()) return;
-    if (!socket || !connected) {
-      setError("Connecting… please try again in a moment");
-      return;
-    }
-    const roomId = generateRoomId();
-    socket.emit("create-room", {
-      roomId,
-      hostId: user._id,
-      username: username.trim(),
-    });
-    sessionStorage.setItem(
-      `room:${roomId}`,
-      JSON.stringify({
-        isHost: true,
-        rounds: Number(rounds) || 3,
-        username: username.trim(),
-      })
-    );
-    navigate(`/room/${roomId}/waiting`);
-  };
+    const name = username.trim();
+    if (!name) return setError("Pick a display name first");
+    if (!socket || !connected) return setError("Connecting… please try again in a moment");
 
-  const handleJoin = () => {
-    setError("");
-    if (!ensureUsername()) return;
-    if (!joinCode.trim()) {
-      setError("Enter a room code");
-      return;
-    }
-    if (!socket || !connected) {
-      setError("Connecting… please try again in a moment");
-      return;
-    }
-    const roomId = joinCode.trim().toUpperCase();
-    socket.emit("join-room", {
+    const isCreate = tab === "create";
+    const roomId = isCreate ? newRoomId() : joinCode.trim().toUpperCase();
+    if (!isCreate && !roomId) return setError("Enter a room code");
+
+    socket.emit(isCreate ? "create-room" : "join-room", {
       roomId,
-      joinerId: user._id,
-      username: username.trim(),
+      ...(isCreate ? { hostId: user._id } : { joinerId: user._id }),
+      username: name,
     });
-    sessionStorage.setItem(
-      `room:${roomId}`,
-      JSON.stringify({ isHost: false, username: username.trim() })
-    );
+
+    sessionStorage.setItem(`room:${roomId}`, JSON.stringify({
+      isHost: isCreate,
+      username: name,
+      ...(isCreate ? { rounds: Number(rounds) || 3 } : {}),
+    }));
     navigate(`/room/${roomId}/waiting`);
   };
 
@@ -89,21 +69,17 @@ export default function LobbyPage() {
             <div className="text-xs text-slate-400">Signed in as</div>
             <div className="text-sm font-semibold">{user?.name || user?.email}</div>
           </div>
-          <button onClick={logout} className="btn-ghost !py-2 !px-3 text-sm">
-            Logout
-          </button>
+          <button onClick={logout} className="btn-ghost !py-2 !px-3 text-sm">Logout</button>
         </div>
       </header>
 
       <main className="relative z-10 max-w-6xl mx-auto mt-12 grid lg:grid-cols-2 gap-8 items-start">
         <section className="animate-fade-in">
           <h2 className="font-display text-5xl md:text-6xl font-bold leading-tight">
-            Doodle.
-            <br />
+            Doodle.<br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-300 to-accent-400">
               Guess fast.
-            </span>
-            <br />
+            </span><br />
             Win points.
           </h2>
           <p className="mt-5 text-lg text-slate-300/80 max-w-md">
@@ -116,18 +92,11 @@ export default function LobbyPage() {
                 house rules
               </div>
               <ul className="mt-2 space-y-2 text-slate-200 text-[15px] leading-relaxed">
-                <li className="flex gap-2">
-                  <span className="text-accent-400">→</span>
-                  no googling. we&apos;ll know.
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-accent-400">→</span>
-                  bad drawing can lead to an FIR.
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-accent-400">→</span>
-                  loser refills the snacks irl.
-                </li>
+                {HOUSE_RULES.map((rule) => (
+                  <li key={rule} className="flex gap-2">
+                    <span className="text-accent-400">→</span>{rule}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -135,16 +104,10 @@ export default function LobbyPage() {
 
         <section className="glass-strong p-7 animate-pop-in">
           <div className="flex p-1 bg-ink-800/60 rounded-xl mb-6 border border-white/5">
-            {[
-              { id: "join", label: "Join Room" },
-              { id: "create", label: "Create Room" },
-            ].map((t) => (
+            {TABS.map((t) => (
               <button
                 key={t.id}
-                onClick={() => {
-                  setTab(t.id);
-                  setError("");
-                }}
+                onClick={() => { setTab(t.id); setError(""); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   tab === t.id
                     ? "bg-brand-500 text-white shadow-glow"
@@ -156,14 +119,7 @@ export default function LobbyPage() {
             ))}
           </div>
 
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (tab === "join") handleJoin();
-              else handleCreate();
-            }}
-          >
+          <form className="space-y-4" onSubmit={submit}>
             <div>
               <label className="label">Display name</label>
               <input
@@ -190,7 +146,7 @@ export default function LobbyPage() {
               <div>
                 <label className="label">Number of rounds</label>
                 <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 5, 8].map((n) => (
+                  {ROUND_OPTIONS.map((n) => (
                     <button
                       key={n}
                       type="button"
@@ -214,15 +170,12 @@ export default function LobbyPage() {
               </div>
             )}
 
-            {tab === "join" ? (
-              <button type="submit" className="btn-primary w-full">
-                Join Room →
-              </button>
-            ) : (
-              <button type="submit" className="btn-accent w-full">
-                Create Room →
-              </button>
-            )}
+            <button
+              type="submit"
+              className={`${tab === "join" ? "btn-primary" : "btn-accent"} w-full`}
+            >
+              {tab === "join" ? "Join Room →" : "Create Room →"}
+            </button>
           </form>
         </section>
       </main>

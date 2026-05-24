@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext.jsx";
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8000";
+
 const SocketContext = createContext(null);
 
 export const useSocket = () => {
@@ -10,30 +12,21 @@ export const useSocket = () => {
   return ctx;
 };
 
-const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL || "http://localhost:8000";
-
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!user?._id) {
-      setSocket(null);
-      setConnected(false);
-      return;
-    }
+    if (!user?._id) return;
 
     const s = io(SOCKET_URL, {
       withCredentials: true,
       auth: { userId: user._id },
       transports: ["websocket"],
     });
-
     s.on("connect", () => setConnected(true));
     s.on("disconnect", () => setConnected(false));
-
     setSocket(s);
 
     return () => {

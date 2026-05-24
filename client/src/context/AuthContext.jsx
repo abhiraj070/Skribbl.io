@@ -3,6 +3,14 @@ import { api } from "../lib/api.js";
 
 const AuthContext = createContext(null);
 
+const readUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user")) || null;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
@@ -10,32 +18,20 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState(readUser);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem("user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("user");
-    }
+    if (user) localStorage.setItem("user", JSON.stringify(user));
+    else localStorage.removeItem("user");
   }, [user]);
 
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const res = await api.post("/users/login", { email, password });
-      const payload = res.data?.data;
-      if (payload?.accessToken) {
-        localStorage.setItem("accessToken", payload.accessToken);
-      }
+      const { data } = await api.post("/users/login", { email, password });
+      const payload = data?.data;
+      if (payload?.accessToken) localStorage.setItem("accessToken", payload.accessToken);
       setUser(payload?.user || null);
       return payload?.user;
     } finally {
@@ -44,21 +40,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password) => {
-    setLoading(true);
-    try {
-      await api.post("/users/register", { name, email, password });
-      return await login(email, password);
-    } finally {
-      setLoading(false);
-    }
+    await api.post("/users/register", { name, email, password });
+    return login(email, password);
   };
 
   const logout = async () => {
-    try {
-      await api.post("/users/logout");
-    } catch {
-      /* ignore */
-    }
+    try { await api.post("/users/logout"); } catch { /* ignore */ }
     localStorage.removeItem("accessToken");
     setUser(null);
   };

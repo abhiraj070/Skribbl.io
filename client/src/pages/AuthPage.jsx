@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
+const MODES = [
+  { id: "login", label: "Sign In", cta: "Sign in" },
+  { id: "register", label: "Create account", cta: "Create account" },
+];
+
 export default function AuthPage() {
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -9,26 +14,24 @@ export default function AuthPage() {
   const { login, register, loading } = useAuth();
   const navigate = useNavigate();
 
-  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     try {
-      if (mode === "login") {
-        await login(form.email, form.password);
-      } else {
-        if (!form.name.trim()) {
-          setError("Please enter your name");
-          return;
-        }
-        await register(form.name, form.email, form.password);
+      if (mode === "register" && !form.name.trim()) {
+        return setError("Please enter your name");
       }
+      if (mode === "login") await login(form.email, form.password);
+      else await register(form.name, form.email, form.password);
       navigate("/lobby");
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Something went wrong");
     }
   };
+
+  const cta = MODES.find((m) => m.id === mode).cta;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
@@ -48,65 +51,31 @@ export default function AuthPage() {
 
         <div className="glass-strong p-7 animate-pop-in">
           <div className="flex p-1 bg-ink-800/60 rounded-xl mb-6 border border-white/5">
-            {["login", "register"].map((m) => (
+            {MODES.map((m) => (
               <button
-                key={m}
-                onClick={() => {
-                  setMode(m);
-                  setError("");
-                }}
+                key={m.id}
+                onClick={() => { setMode(m.id); setError(""); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  mode === m
+                  mode === m.id
                     ? "bg-brand-500 text-white shadow-glow"
                     : "text-slate-300 hover:text-white"
                 }`}
               >
-                {m === "login" ? "Sign In" : "Create account"}
+                {m.label}
               </button>
             ))}
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
             {mode === "register" && (
-              <div>
-                <label className="label">Name</label>
-                <input
-                  name="name"
-                  value={form.name}
-                  onChange={onChange}
-                  placeholder="Raja Ravi Verma"
-                  className="input"
-                  autoComplete="name"
-                />
-              </div>
+              <Field label="Name" name="name" value={form.name} onChange={onChange}
+                placeholder="Raja Ravi Verma" autoComplete="name" />
             )}
-            <div>
-              <label className="label">Email</label>
-              <input
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={onChange}
-                placeholder="you@example.com"
-                className="input"
-                autoComplete="email"
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Password</label>
-              <input
-                name="password"
-                type="password"
-                value={form.password}
-                onChange={onChange}
-                placeholder="••••••••"
-                className="input"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
-                minLength={6}
-              />
-            </div>
+            <Field label="Email" name="email" type="email" value={form.email} onChange={onChange}
+              placeholder="you@example.com" autoComplete="email" required />
+            <Field label="Password" name="password" type="password" value={form.password} onChange={onChange}
+              placeholder="••••••••" required minLength={6}
+              autoComplete={mode === "login" ? "current-password" : "new-password"} />
 
             {error && (
               <div className="text-sm text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
@@ -115,12 +84,20 @@ export default function AuthPage() {
             )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+              {loading ? "Please wait…" : cta}
             </button>
           </form>
         </div>
-
       </div>
+    </div>
+  );
+}
+
+function Field({ label, ...props }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <input className="input" {...props} />
     </div>
   );
 }

@@ -4,6 +4,11 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
 
+const readMeta = (roomId) => {
+  try { return JSON.parse(sessionStorage.getItem(`room:${roomId}`)) || {}; }
+  catch { return {}; }
+};
+
 export default function WaitingPage() {
   const { roomId } = useParams();
   const { user } = useAuth();
@@ -12,14 +17,9 @@ export default function WaitingPage() {
 
   const [players, setPlayers] = useState([]);
   const [error, setError] = useState("");
-  const [meta, setMeta] = useState(() => {
-    try {
-      return JSON.parse(sessionStorage.getItem(`room:${roomId}`)) || {};
-    } catch {
-      return {};
-    }
-  });
-  const isHost = !!meta.isHost;
+  const [meta] = useState(() => readMeta(roomId));
+  const { isHost = false, rounds = 3 } = meta;
+  const canStart = isHost && players.length >= 2;
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -39,47 +39,35 @@ export default function WaitingPage() {
 
   useEffect(() => {
     if (!socket) return;
-    const onStart = () => {
-      navigate(`/room/${roomId}/play`);
-    };
+    const onStart = () => navigate(`/room/${roomId}/play`);
     socket.on("start-my-game", onStart);
     return () => socket.off("start-my-game", onStart);
   }, [socket, roomId, navigate]);
 
-  const handleStart = () => {
-    if (!socket || !connected) return;
-    if (!isHost || players.length < 2) return;
-    socket.emit("start-game", { roomId, rounds: Number(meta.rounds) || 3 });
-  };
+  const startGame = useCallback(() => {
+    if (!canStart || !connected) return;
+    socket?.emit("start-game", { roomId, rounds: Number(rounds) || 3 });
+  }, [socket, connected, canStart, roomId, rounds]);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" || !canStart) return;
       const tag = (e.target?.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) {
-        return;
-      }
-      if (isHost && players.length >= 2) {
-        e.preventDefault();
-        handleStart();
-      }
+      if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) return;
+      e.preventDefault();
+      startGame();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [canStart, startGame]);
 
-  const handleLeave = () => {
+  const leaveRoom = () => {
     if (socket && connected) {
-      const name =
-        meta.username || user?.name?.split(" ")[0] || "Player";
+      const name = meta.username || user?.name?.split(" ")[0] || "Player";
       socket.emit("leave-room", roomId, user._id, name);
     }
     sessionStorage.removeItem(`room:${roomId}`);
     navigate("/lobby");
-  };
-
-  const copyCode = async () => {
-    await navigator.clipboard.writeText(roomId);
   };
 
   return (
@@ -88,23 +76,20 @@ export default function WaitingPage() {
       <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-accent-500/15 rounded-full blur-3xl animate-float-slow" />
 
       <header className="relative z-10 max-w-5xl mx-auto flex items-center justify-between">
-        <button onClick={handleLeave} className="btn-ghost !py-2 !px-3 text-sm">
-          ← Leave
-        </button>
+        <button onClick={leaveRoom} className="btn-ghost !py-2 !px-3 text-sm">← Leave</button>
       </header>
 
       <main className="relative z-10 max-w-5xl mx-auto mt-10 grid lg:grid-cols-[1.1fr,1fr] gap-8 items-start">
         <section className="glass-strong p-7 animate-pop-in">
-          <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Room code
-          </div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Room code</div>
           <div className="mt-2 flex items-center gap-4">
             <div className="font-mono text-5xl md:text-6xl font-bold tracking-[0.3em] bg-clip-text text-transparent bg-gradient-to-r from-brand-300 to-accent-400">
               {roomId}
             </div>
-            <button onClick={copyCode} className="btn-ghost !py-2 !px-3 text-sm">
-              Copy
-            </button>
+            <button
+              onClick={() => navigator.clipboard.writeText(roomId)}
+              className="btn-ghost !py-2 !px-3 text-sm"
+            >Copy</button>
           </div>
           <p className="text-slate-300/80 mt-4 max-w-md">
             Share this code with friends. The game starts when the host hits
@@ -113,16 +98,10 @@ export default function WaitingPage() {
 
           {isHost && (
             <div className="mt-6 p-4 rounded-xl bg-ink-800/50 border border-white/10">
-              <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-                Rounds
-              </div>
+              <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Rounds</div>
               <div className="flex items-center justify-between">
-                <div className="font-display text-3xl font-bold">
-                  {meta.rounds || 3}
-                </div>
-                <div className="text-sm text-slate-400">
-                  ~{(meta.rounds || 3) * 2} min playtime
-                </div>
+                <div className="font-display text-3xl font-bold">{rounds}</div>
+                <div className="text-sm text-slate-400">~{rounds * 2} min playtime</div>
               </div>
             </div>
           )}
@@ -130,12 +109,12 @@ export default function WaitingPage() {
           <div className="mt-7 flex gap-3">
             {isHost ? (
               <button
-                onClick={handleStart}
-                disabled={players.length < 2}
+                onClick={startGame}
+                disabled={!canStart}
                 className="btn-accent flex-1"
-                title={players.length < 2 ? "Need at least 2 players" : "Start the game"}
+                title={canStart ? "Start the game" : "Need at least 2 players"}
               >
-                {players.length < 2 ? "Waiting for more players…" : "Start Game →"}
+                {canStart ? "Start Game →" : "Waiting for more players…"}
               </button>
             ) : (
               <div className="flex-1 text-center py-3 rounded-xl bg-ink-800/60 border border-white/10 text-slate-300">
@@ -160,9 +139,7 @@ export default function WaitingPage() {
           </div>
           <ul className="space-y-2 max-h-[460px] overflow-y-auto scroll-thin pr-1">
             {players.length === 0 && (
-              <li className="text-center text-slate-400 py-8">
-                Hang tight — fetching players…
-              </li>
+              <li className="text-center text-slate-400 py-8">Hang tight — fetching players…</li>
             )}
             {players.map((p, i) => (
               <li
@@ -174,9 +151,7 @@ export default function WaitingPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold truncate">{p.username}</div>
-                  <div className="text-xs text-slate-400 truncate">
-                    {p.name || "—"}
-                  </div>
+                  <div className="text-xs text-slate-400 truncate">{p.name || "—"}</div>
                 </div>
                 {i === 0 && (
                   <span className="chip bg-accent-500/20 text-accent-400 border border-accent-500/30">

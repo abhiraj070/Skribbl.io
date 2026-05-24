@@ -6,63 +6,34 @@ import LobbyPage from "./pages/LobbyPage.jsx";
 import WaitingPage from "./pages/WaitingPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 
-function RequireAuth({ children }) {
+function Gate({ guest, children }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/auth" replace />;
+  if (guest && user) return <Navigate to="/lobby" replace />;
+  if (!guest && !user) return <Navigate to="/auth" replace />;
   return children;
 }
 
-function GuestOnly({ children }) {
-  const { user } = useAuth();
-  if (user) return <Navigate to="/lobby" replace />;
-  return children;
-}
-
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route
-        path="/auth"
-        element={
-          <GuestOnly>
-            <AuthPage />
-          </GuestOnly>
-        }
-      />
-      <Route
-        path="/lobby"
-        element={
-          <RequireAuth>
-            <LobbyPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/room/:roomId/waiting"
-        element={
-          <RequireAuth>
-            <WaitingPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/room/:roomId/play"
-        element={
-          <RequireAuth>
-            <GamePage />
-          </RequireAuth>
-        }
-      />
-      <Route path="*" element={<Navigate to="/lobby" replace />} />
-    </Routes>
-  );
-}
+const ROUTES = [
+  { path: "/auth", element: <AuthPage />, guest: true },
+  { path: "/lobby", element: <LobbyPage /> },
+  { path: "/room/:roomId/waiting", element: <WaitingPage /> },
+  { path: "/room/:roomId/play", element: <GamePage /> },
+];
 
 export default function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <AppRoutes />
+        <Routes>
+          {ROUTES.map(({ path, element, guest }) => (
+            <Route
+              key={path}
+              path={path}
+              element={<Gate guest={guest}>{element}</Gate>}
+            />
+          ))}
+          <Route path="*" element={<Navigate to="/lobby" replace />} />
+        </Routes>
       </SocketProvider>
     </AuthProvider>
   );
