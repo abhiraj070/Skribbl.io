@@ -355,9 +355,9 @@ export default function GamePage() {
   );
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 relative">
-      <div className="max-w-[1400px] mx-auto">
-        <header className="grid grid-cols-3 items-center gap-3 mb-4">
+    <div className="h-screen p-3 sm:p-4 relative overflow-hidden flex flex-col">
+      <div className="max-w-[1600px] w-full mx-auto flex-1 flex flex-col min-h-0">
+        <header className="grid grid-cols-3 items-center gap-3 mb-3 shrink-0">
           <div className="flex items-center gap-3 justify-self-start">
             <span className="text-2xl">🎨</span>
             <div>
@@ -388,15 +388,15 @@ export default function GamePage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[220px,1fr,320px] gap-4">
-          <aside className="glass p-4 order-2 lg:order-1">
-            <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[200px,1fr,300px] gap-3 flex-1 min-h-0">
+          <aside className="glass p-3 order-2 lg:order-1 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-3 shrink-0">
               <h3 className="font-display text-lg font-bold">Players</h3>
               <span className="chip bg-white/5 border border-white/10 text-slate-300 text-[10px]">
                 {players.length}
               </span>
             </div>
-            <ul className="space-y-2 max-h-[60vh] overflow-y-auto scroll-thin pr-1">
+            <ul className="space-y-2 flex-1 min-h-0 overflow-y-auto scroll-thin pr-1">
               {sortedPlayers.map((p, i) => (
                 <li
                   key={`${p.username}-${i}`}
@@ -433,8 +433,8 @@ export default function GamePage() {
             </ul>
           </aside>
 
-          <section className="order-1 lg:order-2 space-y-3">
-            <div className="glass p-3 flex items-center justify-between gap-3 flex-wrap">
+          <section className="order-1 lg:order-2 flex flex-col gap-3 min-h-0">
+            <div className="glass p-3 flex items-center justify-between gap-3 flex-wrap shrink-0">
               <div className="text-xs uppercase tracking-wider text-slate-400">
                 {isDrawer ? "Your word" : "Guess the word"}
               </div>
@@ -451,7 +451,7 @@ export default function GamePage() {
               </div>
             </div>
 
-            <div className="relative aspect-[16/10] lg:aspect-[16/9]">
+            <div className="relative flex-1 min-h-0">
               <Whiteboard isDrawer={isDrawer} word={drawerWord} />
 
               {phase === PHASES.STARTING && (
@@ -547,9 +547,9 @@ export default function GamePage() {
             </div>
           </section>
 
-          <aside className="order-3 glass p-4 flex flex-col h-[70vh] lg:h-auto lg:max-h-[80vh]">
-            <h3 className="font-display text-lg font-bold mb-3">Chat</h3>
-            <div className="flex-1 overflow-y-auto scroll-thin space-y-1.5 pr-1 mb-3 min-h-[200px]">
+          <aside className="order-3 glass p-3 flex flex-col min-h-0">
+            <h3 className="font-display text-lg font-bold mb-3 shrink-0">Chat</h3>
+            <div className="flex-1 overflow-y-auto scroll-thin space-y-1.5 pr-1 mb-3 min-h-0">
               {chat.length === 0 && (
                 <div className="text-slate-500 text-sm text-center py-4">
                   No messages yet. Say hi!
@@ -582,7 +582,7 @@ export default function GamePage() {
               <div ref={chatBottomRef} />
             </div>
 
-            <form onSubmit={sendChat} className="mb-2">
+            <form onSubmit={sendChat} className="mb-2 shrink-0">
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
@@ -598,7 +598,7 @@ export default function GamePage() {
               />
             </form>
 
-            <form onSubmit={sendGuess}>
+            <form onSubmit={sendGuess} className="shrink-0">
               <input
                 value={guessInput}
                 onChange={(e) => setGuessInput(e.target.value)}

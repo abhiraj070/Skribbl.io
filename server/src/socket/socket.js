@@ -29,6 +29,9 @@ export const InitliseIO = (io) => {
         const room = rooms[roomId]
         if (!room) return
 
+        room.canvasObjects = []
+        io.to(roomId).emit("canvas-operation", { type: "CLEAR", roomId })
+
         const drawerSocketId = getDrawerSocketId(room)
         if (drawerSocketId) {
             io.to(drawerSocketId).emit("Drawing-Phase", { wordSelected: word, duration: 100 })
@@ -111,7 +114,8 @@ export const InitliseIO = (io) => {
                 users: [],
                 word: {},
                 currentDrawerIndex: 0,
-                rounds: 0
+                rounds: 0,
+                canvasObjects: []
             }
             rooms[roomId].users.push({ id: hostId, username: username, points: 0 })
             socketIdToId[socket.id] = { id: hostId, roomId }
@@ -207,6 +211,51 @@ export const InitliseIO = (io) => {
             if (user) {
                 user.points = (user.points ?? 0) + points
             }
+        })
+
+        socket.on("canvas-operation", (operation) => {
+            if (!operation || typeof operation !== "object") return
+            const { type, roomId } = operation
+            const room = rooms[roomId]
+            if (!room) return
+
+            const entry = socketIdToId[socket.id]
+            const userId = typeof entry === "string" ? entry : entry?.id
+            const inRoom = room.users.some((u) => u.id == userId)
+            if (!inRoom) return
+
+            if (!Array.isArray(room.canvasObjects)) room.canvasObjects = []
+
+            switch (type) {
+                case "ADD_OBJECT": {
+                    if (!operation.objectData) return
+                    room.canvasObjects.push(operation.objectData)
+                    break
+                }
+                case "REMOVE_OBJECT": {
+                    if (!operation.objectId) return
+                    room.canvasObjects = room.canvasObjects.filter(
+                        (o) => o.objectId !== operation.objectId
+                    )
+                    break
+                }
+                case "CLEAR": {
+                    room.canvasObjects = []
+                    break
+                }
+                default:
+                    return
+            }
+
+            socket.to(roomId).emit("canvas-operation", operation)
+        })
+
+        socket.on("request-canvas-state", ({ roomId }) => {
+            const room = rooms[roomId]
+            if (!room) return
+            socket.emit("canvas-state", {
+                objects: Array.isArray(room.canvasObjects) ? room.canvasObjects : [],
+            })
         })
 
     });
