@@ -55,11 +55,13 @@ export const InitliseIO = (io) => {
         const words = selectWords()
         roundWords[roomId] = words
         const drawerSocketId = getDrawerSocketId(room)
+        const drawer = room.users[room.currentDrawerIndex]
+        const drawerName = drawer?.username || "Someone"
 
-        io.to(roomId).emit("Word-Selection-Waiting", { duration: 10 })
+        io.to(roomId).emit("Word-Selection-Waiting", { duration: 10, drawerName })
 
         if (drawerSocketId) {
-            io.to(drawerSocketId).emit("Word-Selection-Phase", { words, duration: 10 })
+            io.to(drawerSocketId).emit("Word-Selection-Phase", { words, duration: 10, drawerName })
         }
 
         if (selectionTimer[roomId]) clearTimeout(selectionTimer[roomId])

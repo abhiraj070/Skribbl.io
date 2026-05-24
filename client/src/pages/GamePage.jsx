@@ -73,6 +73,7 @@ export default function GamePage() {
   const [revealedWord, setRevealedWord] = useState(null);
 
   const [isDrawer, setIsDrawer] = useState(false);
+  const [drawerName, setDrawerName] = useState(null);
   const [chat, setChat] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [guessInput, setGuessInput] = useState("");
@@ -122,7 +123,10 @@ export default function GamePage() {
     setChatInput("");
     setGuessInput("");
     correctGuessersRef.current = new Set();
-    if (alsoDrawer) setIsDrawer(false);
+    if (alsoDrawer) {
+      setIsDrawer(false);
+      setDrawerName(null);
+    }
   };
 
   useEffect(() => {
@@ -133,18 +137,26 @@ export default function GamePage() {
         resetRound(true);
         startPhase(PHASES.STARTING, duration);
       },
-      "Word-Selection-Waiting": ({ duration = 10 } = {}) => {
+      "Word-Selection-Waiting": ({ duration = 10, drawerName: name } = {}) => {
         resetRound();
         setIsDrawer(false);
+        setDrawerName(name || null);
         startPhase(PHASES.WORD_SELECTION, duration);
-        pushSystem("New round — drawer is picking a word…", "muted");
+        if (name) {
+          pushSystem(
+            name === username ? "You are the drawer — pick a word!" : `${name} is the drawer — picking a word…`,
+            "muted"
+          );
+        } else {
+          pushSystem("New round — drawer is picking a word…", "muted");
+        }
       },
-      "Word-Selection-Phase": ({ words, duration = 10 } = {}) => {
+      "Word-Selection-Phase": ({ words, duration = 10, drawerName: name } = {}) => {
         resetRound(true);
         setIsDrawer(true);
+        setDrawerName(name || username);
         setWordChoices(words || []);
         startPhase(PHASES.WORD_SELECTION, duration);
-        pushSystem("Pick a word to draw!", "muted");
       },
       "Drawing-Phase": ({ wordSelected, duration = PHASE_DURATIONS.DRAWING } = {}) => {
         setIsDrawer(true);
@@ -202,7 +214,7 @@ export default function GamePage() {
 
     for (const [evt, fn] of Object.entries(handlers)) socket.on(evt, fn);
     return () => { for (const [evt, fn] of Object.entries(handlers)) socket.off(evt, fn); };
-  }, [socket, players.length, roomId, user?._id, fetchPlayers]);
+  }, [socket, players.length, roomId, user?._id, username, fetchPlayers]);
 
   const pickWord = (w) => {
     if (!socket || !w) return;
@@ -280,7 +292,10 @@ export default function GamePage() {
               </div>
               <WordDisplay length={wordLength} revealedWord={topDisplayWord} variant={topDisplayVariant} />
               <div className="text-xs text-slate-400">
-                Drawer: <span className="text-white font-semibold">{isDrawer ? "You" : "—"}</span>
+                Drawer:{" "}
+                <span className="text-white font-semibold">
+                  {isDrawer ? "You" : drawerName || "—"}
+                </span>
               </div>
             </div>
 
@@ -309,7 +324,10 @@ export default function GamePage() {
               )}
 
               {phase === PHASES.WORD_SELECTION && !isDrawer && (
-                <PhaseOverlay title="Drawer is picking a word…" subtitle={`Starts in ~${timeLeft}s`} />
+                <PhaseOverlay
+                  title={`${drawerName || "Drawer"} is picking a word…`}
+                  subtitle={`Starts in ~${timeLeft}s`}
+                />
               )}
 
               {phase === PHASES.RESULT && (
