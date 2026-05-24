@@ -17,7 +17,6 @@ const PHASES = {
 
 const CORRECT_MARKER = "__SKRIBBL_CORRECT__";
 
-// Match server/src/socket/socket.js phase durations
 const PHASE_DURATIONS = {
   STARTING: 5,
   WORD_SELECTION: 10,
@@ -227,6 +226,7 @@ export default function GamePage() {
       pushSystem(`✓ You guessed it! +100 points`, "success");
       socket.emit("score-update", { roomId, playerId: user._id, points: 100, delta: 100 });
       socket.emit("sent-message", roomId, CORRECT_MARKER, username);
+      socket.emit("word-guessed", roomId);
     } else {
       pushUser(username, value);
       socket.emit("sent-message", roomId, value, username);

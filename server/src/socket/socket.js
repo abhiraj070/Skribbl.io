@@ -44,7 +44,7 @@ export const InitliseIO = (io) => {
         if (drawingTimer[roomId]) clearTimeout(drawingTimer[roomId])
         drawingTimer[roomId] = setTimeout(() => {
             io.to(roomId).emit("Correct-Word", { corectWord: word })
-            endRound(roomId)
+            endTurn(roomId)
         }, 100000)
     }
 
@@ -75,19 +75,20 @@ export const InitliseIO = (io) => {
         beginDrawingPhase(roomId, words[idx])
     }
 
-    function endRound(roomId) {
+    function endTurn(roomId) {
         const room = rooms[roomId]
         if (!room) return
-
+        if(room.currentDrawerIndex==room.users.length-1){
+            room.rounds-=1
+        }
         io.to(roomId).emit("Show-Result-Phase", { duration: 10 })
-        room.rounds -= 1
-
         if (resultTimer[roomId]) clearTimeout(resultTimer[roomId])
         resultTimer[roomId] = setTimeout(() => {
             if (room.rounds <= 0) {
                 endGame(roomId)
             } else {
                 room.currentDrawerIndex = (room.currentDrawerIndex + 1) % room.users.length
+                room.totalAnswered=0
                 startWordSelection(roomId)
             }
         }, 10000)
@@ -115,7 +116,8 @@ export const InitliseIO = (io) => {
                 word: {},
                 currentDrawerIndex: 0,
                 rounds: 0,
-                canvasObjects: []
+                canvasObjects: [],
+                totalAnswered: 0
             }
             rooms[roomId].users.push({ id: hostId, username: username, points: 0 })
             socketIdToId[socket.id] = { id: hostId, roomId }
@@ -256,6 +258,16 @@ export const InitliseIO = (io) => {
             socket.emit("canvas-state", {
                 objects: Array.isArray(room.canvasObjects) ? room.canvasObjects : [],
             })
+        })
+
+        socket.on("word-guessed",(roomId)=>{
+            const room= rooms[roomId]
+            room.totalAnswered+=1;
+            if(room.totalAnswered==room.users.length-1){
+                clearRoomTimers(roomId)
+                io.to(roomId).emit("Correct-Word", { corectWord: room.word })
+                endTurn(roomId)
+            }
         })
 
     });
