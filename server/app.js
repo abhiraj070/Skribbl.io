@@ -11,7 +11,7 @@ const server= http.createServer(app)
 
 const io= new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL,
+        origin: process.env.ENV=="development" ? process.env.CLIENT_DEV_URL : process.env.CLIENT_URL,
         credentials: true,
     },
 })

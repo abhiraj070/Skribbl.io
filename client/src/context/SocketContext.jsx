@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext.jsx";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8000";
+const SOCKET_URL = import.meta.env.VITE_NODE_ENV==="development" ? import.meta.env.VITE_API_DEV_URL : import.meta.env.VITE_API_URL;
 
 const SocketContext = createContext(null);
 
