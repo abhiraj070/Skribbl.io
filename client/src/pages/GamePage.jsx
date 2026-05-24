@@ -67,17 +67,25 @@ export default function GamePage() {
   const [guessInput, setGuessInput] = useState("");
   const [hasGuessedCorrect, setHasGuessedCorrect] = useState(false);
   const correctGuessersRef = useRef(new Set());
+  const isDrawerRef = useRef(false);
   const chatBottomRef = useRef(null);
 
   const timeLeft = useCountdown(phaseSeconds, phaseKey);
+  const isDrawingAsDrawer = isDrawer && phase === PHASES.DRAWING;
+  const drawerWordText =
+    drawerWord?.word ?? (typeof drawerWord === "string" ? drawerWord : null);
+  const topDisplayWord = isDrawingAsDrawer
+    ? drawerWordText
+    : revealedWord;
+  const topDisplayVariant = isDrawingAsDrawer
+    ? "drawer"
+    : revealedWord
+      ? "success"
+      : "default";
 
   const fetchPlayers = useCallback(async () => {
-    try {
       const res = await api.get("/users/room-users", { params: { roomId } });
       setPlayers(res.data?.data?.users || []);
-    } catch {
-      /* ignore */
-    }
   }, [roomId]);
 
   useEffect(() => {
@@ -114,8 +122,25 @@ export default function GamePage() {
     setRevealedWord(null);
     setIsDrawer(false);
     setHasGuessedCorrect(false);
+    setChatInput("");
+    setGuessInput("");
     correctGuessersRef.current = new Set();
   };
+
+  const resetGuesserRound = () => {
+    setDrawerWord(null);
+    setRevealedWord(null);
+    setWordLength(0);
+    setWordChoices(null);
+    setHasGuessedCorrect(false);
+    setChatInput("");
+    setGuessInput("");
+    correctGuessersRef.current = new Set();
+  };
+
+  useEffect(() => {
+    isDrawerRef.current = isDrawer;
+  }, [isDrawer]);
 
   // ---- Socket bindings ----
   useEffect(() => {
@@ -126,6 +151,15 @@ export default function GamePage() {
       setPhase(PHASES.STARTING);
       setPhaseSeconds(duration);
       setPhaseKey((k) => k + 1);
+    };
+
+    const onWordSelectionWaiting = ({ duration = 10 } = {}) => {
+      resetGuesserRound();
+      setIsDrawer(false);
+      setPhase(PHASES.WORD_SELECTION);
+      setPhaseSeconds(duration);
+      setPhaseKey((k) => k + 1);
+      pushSystem("New round — drawer is picking a word…", "muted");
     };
 
     const onWordSelection = ({ words, duration = 10 } = {}) => {
@@ -142,15 +176,19 @@ export default function GamePage() {
       // Sent only to the drawer
       setIsDrawer(true);
       setDrawerWord(wordSelected);
+      setRevealedWord(null);
       setWordLength(wordSelected?.length || wordSelected?.word?.length || 0);
       setPhase(PHASES.DRAWING);
       setPhaseSeconds(duration);
       setPhaseKey((k) => k + 1);
+      setChatInput("");
+      setGuessInput("");
       pushSystem(`You're drawing: ${wordSelected?.word ?? "?"}`, "muted");
     };
 
     const onGuessing = ({ lengthOfWordSelected, duration = 80 } = {}) => {
-      // Sent to non-drawers
+      // Sent to non-drawers (including everyone in room on new round)
+      resetGuesserRound();
       setIsDrawer(false);
       setWordLength(lengthOfWordSelected || 0);
       setPhase(PHASES.DRAWING);
@@ -178,7 +216,7 @@ export default function GamePage() {
       setPhaseKey((k) => k + 1);
 
       // Drawer awards themselves based on how many guessed correctly
-      if (isDrawer) {
+      if (isDrawerRef.current) {
         const total = Math.max(players.length - 1, 1);
         const correct = correctGuessersRef.current.size;
         const ratio = correct / total;
@@ -219,7 +257,13 @@ export default function GamePage() {
       pushUserMessage(sender, message);
     };
 
+    const onLeaveRoomMessage = ({ message } = {}) => {
+      if (message) pushSystem(message, "muted");
+      fetchPlayers();
+    };
+
     socket.on("Starting-Phase", onStarting);
+    socket.on("Word-Selection-Waiting", onWordSelectionWaiting);
     socket.on("Word-Selection-Phase", onWordSelection);
     socket.on("Drawing-Phase", onDrawing);
     socket.on("Gussing-Phase", onGuessing);
@@ -228,9 +272,11 @@ export default function GamePage() {
     socket.on("Show-Result-Phase", onShowResult);
     socket.on("Game-End-Phase", onGameEnd);
     socket.on("sent-message-recived", onChatRecieved);
+    socket.on("leave-room-mesaage", onLeaveRoomMessage);
 
     return () => {
       socket.off("Starting-Phase", onStarting);
+      socket.off("Word-Selection-Waiting", onWordSelectionWaiting);
       socket.off("Word-Selection-Phase", onWordSelection);
       socket.off("Drawing-Phase", onDrawing);
       socket.off("Gussing-Phase", onGuessing);
@@ -239,8 +285,9 @@ export default function GamePage() {
       socket.off("Show-Result-Phase", onShowResult);
       socket.off("Game-End-Phase", onGameEnd);
       socket.off("sent-message-recived", onChatRecieved);
+      socket.off("leave-room-mesaage", onLeaveRoomMessage);
     };
-  }, [socket, isDrawer, players.length, roomId, user?._id, fetchPlayers]);
+  }, [socket, players.length, roomId, user?._id, fetchPlayers]);
 
   // ---- Actions ----
   const pickWord = (w) => {
@@ -248,11 +295,14 @@ export default function GamePage() {
     socket.emit("word-selected", { selectedWord: w, roomId });
     socket.emit("selected-word", { roomId, word: w });
     setDrawerWord(w);
+    setRevealedWord(null);
     setWordLength(w?.length || w?.word?.length || 0);
     setWordChoices(null);
     setPhase(PHASES.DRAWING);
     setPhaseSeconds(80);
     setPhaseKey((k) => k + 1);
+    setChatInput("");
+    setGuessInput("");
   };
 
   const sendChat = (e) => {
@@ -260,6 +310,7 @@ export default function GamePage() {
     const text = chatInput.trim();
     if (!text || !socket) return;
     if (hasGuessedCorrect) return;
+    if (isDrawingAsDrawer) return;
     pushUserMessage(username, text);
     socket.emit("sent-message", roomId, text, username);
     setChatInput("");
@@ -269,7 +320,7 @@ export default function GamePage() {
     e?.preventDefault?.();
     const text = guessInput.trim();
     if (!text || !socket) return;
-    if (isDrawer) return;
+    if (isDrawingAsDrawer) return;
     if (hasGuessedCorrect) return;
     const target = (drawerWord?.word || drawerWord || "").toString().trim().toLowerCase();
     if (target && text.toLowerCase() === target) {
@@ -291,7 +342,7 @@ export default function GamePage() {
   };
 
   const leaveGame = () => {
-    if (socket) socket.emit("leave-room", roomId, user._id);
+    if (socket) socket.emit("leave-room", roomId, user._id, username);
     sessionStorage.removeItem(`room:${roomId}`);
     navigate("/lobby");
   };
@@ -381,7 +432,11 @@ export default function GamePage() {
               <div className="text-xs uppercase tracking-wider text-slate-400">
                 {isDrawer ? "Your word" : "Guess the word"}
               </div>
-              <WordDisplay length={wordLength} revealedWord={revealedWord} />
+              <WordDisplay
+                length={wordLength}
+                revealedWord={topDisplayWord}
+                variant={topDisplayVariant}
+              />
               <div className="text-xs text-slate-400">
                 Drawer:{" "}
                 <span className="text-white font-semibold">
@@ -527,11 +582,13 @@ export default function GamePage() {
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={
-                  hasGuessedCorrect
+                  isDrawingAsDrawer
+                    ? "You're drawing — chat locked"
+                    : hasGuessedCorrect
                     ? "You already guessed — chat locked"
                     : "Send a message…"
                 }
-                disabled={hasGuessedCorrect}
+                disabled={hasGuessedCorrect || isDrawingAsDrawer}
                 className="input !py-2.5"
               />
             </form>
@@ -541,13 +598,13 @@ export default function GamePage() {
                 value={guessInput}
                 onChange={(e) => setGuessInput(e.target.value)}
                 placeholder={
-                  isDrawer
+                  isDrawingAsDrawer
                     ? "You're drawing!"
                     : hasGuessedCorrect
                     ? "✓ Already guessed correctly"
                     : "Type your guess + Enter"
                 }
-                disabled={isDrawer || hasGuessedCorrect}
+                disabled={isDrawingAsDrawer || hasGuessedCorrect}
                 className={`input !py-2.5 font-semibold ${
                   hasGuessedCorrect
                     ? "!border-success/40 !bg-success/5"

@@ -55,18 +55,16 @@ export default function WaitingPage() {
 
   const handleLeave = () => {
     if (socket && connected) {
-      socket.emit("leave-room", roomId, user._id);
+      const name =
+        meta.username || user?.name?.split(" ")[0] || "Player";
+      socket.emit("leave-room", roomId, user._id, name);
     }
     sessionStorage.removeItem(`room:${roomId}`);
     navigate("/lobby");
   };
 
   const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(roomId);
-    } catch {
-      /* noop */
-    }
+    await navigator.clipboard.writeText(roomId);
   };
 
   return (
