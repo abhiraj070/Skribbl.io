@@ -1,6 +1,14 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_NODE_ENV === "development" ? import.meta.env.VITE_API_DEV_URL : import.meta.env.VITE_API_URL;
+const configuredBaseURL = import.meta.env.DEV
+  ? import.meta.env.VITE_API_DEV_URL
+  : import.meta.env.VITE_API_URL;
+
+if (!configuredBaseURL) {
+  throw new Error("Missing API URL. Set VITE_API_URL in the production client environment.");
+}
+
+const baseURL = configuredBaseURL.replace(/\/$/, "");
 
 export const api = axios.create({
   baseURL: `${baseURL}/api`,
