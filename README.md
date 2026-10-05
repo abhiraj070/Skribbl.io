@@ -235,17 +235,3 @@ Open [http://localhost:5173](http://localhost:5173), register an account, create
 - Socket.io CORS uses `CLIENT_DEV_URL` in development and `CLIENT_URL` in production
 - Cookies use `secure: true` and `sameSite: "none"` in production for cross-origin auth
 
----
-
-## Known Limitations
-
-- **In-memory rooms** — room state is lost on server restart; not persisted to MongoDB
-- **No mid-game reconnect** — refreshing the page drops you from the room
-- **Waiting room polling** — player list refreshes via REST every 2.5s instead of a live socket broadcast
-- **Word pool** — ~100 static words in `server/src/utils/words.js`
-
----
-
-## License
-
-ISC
