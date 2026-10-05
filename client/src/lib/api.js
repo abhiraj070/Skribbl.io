@@ -5,10 +5,10 @@ const configuredBaseURL = import.meta.env.DEV
   : import.meta.env.VITE_API_URL;
 
 if (!configuredBaseURL) {
-  throw new Error("Missing API URL. Set VITE_API_URL in the production client environment.");
+  console.error("Missing API URL. Set VITE_API_URL in the production client environment.");
 }
 
-const baseURL = configuredBaseURL.replace(/\/$/, "");
+const baseURL = configuredBaseURL ? configuredBaseURL.replace(/\/$/, "") : window.location.origin;
 
 export const api = axios.create({
   baseURL: `${baseURL}/api`,
