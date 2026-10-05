@@ -8,23 +8,19 @@ const app = express();
 import { Server } from 'socket.io';
 
 const server= http.createServer(app)
+const clientOrigin = process.env.ENV === "development"
+    ? process.env.CLIENT_DEV_URL
+    : process.env.CLIENT_URL;
 
 const io= new Server(server, {
     cors: {
-        origin: process.env.ENV=="development" ? process.env.CLIENT_DEV_URL : process.env.CLIENT_URL,
+        origin: clientOrigin,
         credentials: true,
     },
 })
 
-app.use(cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-}))
-
 app.use(helmet());
-app.use(cors({ 
-    origin: process.env.CLIENT_URL, credentials: true 
-}));
+app.use(cors({ origin: clientOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
